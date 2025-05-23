@@ -22,6 +22,7 @@ TZ="America/New_York"
 BASE_HOST_NAME="$HOSTNAME"
 BASE_DOMAIN_NAME="$(hostname -d 2>/dev/null | grep '^' || echo "$HOSTNAME")"
 BASE_STORAGE_DIR="/var/lib/srv/$USER/docker"
+BASE_DATABASE_DIR="/var/lib/srv/$USER/databases" 
 ```
 
 ## user and group
