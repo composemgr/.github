@@ -1,0 +1,49 @@
+# nginx proxy address - http://172.17.0.1:80
+
+name: template
+x-logging: &default-logging
+  options:
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
+
+services:
+  app:
+    image: template:latest
+    container_name: template-app
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}}
+    ports:
+      - 172.17.0.1:80:3000'
+    volumes:
+      - '/var/lib/srv/${USER}/docker/template/rootfs/data:/data:z'
+      - '/var/lib/srv/${USER}/docker/template/rootfs/config:/config:z'
+    labels:
+      - "traefik.enable=true"
+      - "cloudflared.enable=true"
+      - "cloudflared.hostname=template.${CLOUDFLARE_DOMAIN}"
+      - "cloudflared.service=http://template:3000"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.template.tls=true"
+      - "traefik.http.routers.template.entrypoints=web"
+      - "traefik.http.routers.template.service=template"
+      - "traefik.http.services.template.loadbalancer.server.port=3000"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.template.rule=Host(`${BASE_HOST_NAME:-$HOSTNAME}`)"
+    networks:
+      - template
+      - cloudflared
+
+networks:
+  template:
+    name: template
+    external: false
+  traefix:
+    external: true
+  cloudflared:
+    external: true
