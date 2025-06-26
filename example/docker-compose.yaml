@@ -1,0 +1,56 @@
+# nginx proxy address - http://172.17.0.1:3000
+
+name: template
+x-logging: &default-logging
+  options:
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
+
+services:
+  app:
+    image: template:latest
+    container_name: template-app
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
+    expose:
+      - '3000'
+    volumes:
+      - './rootfs/data/app:/data:z'
+      - './rootfs/config/app:/config:z'
+      - '/etc/timezone:/etc/timezone:ro'
+      - '/etc/localtime:/etc/localtime:ro'
+    networks:
+      - template
+      - proxy
+      - cloudflare
+    labels:
+      - 'traefik.enable=true'
+      - 'cloudflare.enable=true'
+      - 'cloudflare.hostname=template-app.${CLOUDFLARE_ZONE_NAME}'
+      - 'cloudflare.service=http://template-app:3000'
+      - 'traefik.docker.network=proxy'
+      - 'traefik.http.routers.template-app.entrypoints=http'
+      - 'traefik.http.routers.template-app-secure.tls=true'
+      - 'traefik.http.routers.template-app.rule=Host(`${BASE_HOST_NAME:-$HOSTNAME}`)'
+      - 'traefik.http.middlewares.template-app-https-redirect.redirectscheme.scheme=https'
+      - 'traefik.http.routers.template-app.middlewares=template-app-https-redirect'
+      - 'traefik.http.routers.template-app-secure.entrypoints=https'
+      - 'traefik.http.routers.template-app-secure.rule=Host(`${BASE_HOST_NAME:-$HOSTNAME}`)'
+      - 'traefik.http.routers.template-app-secure.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.template-app-secure.service=template-app'
+      - 'traefik.http.services.template-app.loadbalancer.server.port=3000'
+
+networks:
+  template:
+    name: template
+    external: false
+  proxy:
+    external: true
+  cloudflare:
+    external: true
