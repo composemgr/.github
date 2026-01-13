@@ -1,6 +1,6 @@
-# nginx proxy address - http://172.17.0.1:3000
+# nginx proxy address - http://172.17.0.1:62000
 
-name: template
+name: test
 x-logging: &default-logging
   options:
     max-size: '5m'
@@ -9,48 +9,48 @@ x-logging: &default-logging
 
 services:
   app:
-    image: template:latest
-    container_name: template-app
+    image: test:latest
+    container_name: test-app
     hostname: ${BASE_HOST_NAME:-$HOSTNAME}
     restart: always
     pull_policy: always
     logging: *default-logging
     environment:
       TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: test-app
       HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
-    expose:
-      - '3000'
+    ports:
+      - '172.17.0.1:62000:3000'
     volumes:
-      - './rootfs/data/app:/data:z'
-      - './rootfs/config/app:/config:z'
-      - '/etc/timezone:/etc/timezone:ro'
-      - '/etc/localtime:/etc/localtime:ro'
-    networks:
-      - template
-      - proxy
-      - cloudflare
+      - './rootfs/data:/data:z'
+      - './rootfs/config:/config:z'
     labels:
       - 'traefik.enable=true'
       - 'cloudflare.enable=true'
-      - 'cloudflare.hostname=template-app.${CLOUDFLARE_ZONE_NAME}'
-      - 'cloudflare.service=http://template-app:3000'
       - 'traefik.docker.network=proxy'
-      - 'traefik.http.routers.template-app.entrypoints=http'
-      - 'traefik.http.routers.template-app-secure.tls=true'
-      - 'traefik.http.routers.template-app.rule=Host(`${BASE_HOST_NAME:-$HOSTNAME}`)'
-      - 'traefik.http.middlewares.template-app-https-redirect.redirectscheme.scheme=https'
-      - 'traefik.http.routers.template-app.middlewares=template-app-https-redirect'
-      - 'traefik.http.routers.template-app-secure.entrypoints=https'
-      - 'traefik.http.routers.template-app-secure.rule=Host(`${BASE_HOST_NAME:-$HOSTNAME}`)'
-      - 'traefik.http.routers.template-app-secure.tls.certresolver=cloudflare'
-      - 'traefik.http.routers.template-app-secure.service=template-app'
-      - 'traefik.http.services.template-app.loadbalancer.server.port=3000'
+      - 'cloudflare.service=http://test-app:3000'
+      - 'cloudflare.hostname=test.${CLOUDFLARE_ZONE_NAME:-}'
+      - 'traefik.http.routers.test-app.entrypoints=http'
+      - 'traefik.http.routers.test-app-secure.tls=true'
+      - 'traefik.http.routers.test-app.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.middlewares.test-app-https-redirect.redirectscheme.scheme=https'
+      - 'traefik.http.routers.test-app.middlewares=test-app-https-redirect'
+      - 'traefik.http.routers.test-app-secure.entrypoints=https'
+      - 'traefik.http.routers.test-app-secure.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.routers.test-app-secure.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.test-app-secure.service=test-app'
+      - 'traefik.http.services.test-app.loadbalancer.server.port=3000'
+    networks:
+      - test
+      - proxy
+      - cloudflare
 
 networks:
-  template:
-    name: template
+  test:
+    name: test
     external: false
   proxy:
     external: true
   cloudflare:
     external: true
+
