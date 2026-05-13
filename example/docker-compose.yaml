@@ -22,8 +22,8 @@ services:
     ports:
       - '172.17.0.1:62000:3000'
     volumes:
-      - './rootfs/data:/data:z'
-      - './rootfs/config:/config:z'
+      - './volumes/data:/data:z'
+      - './volumes/config:/config:z'
     labels:
       - 'traefik.enable=true'
       - 'cloudflare.enable=true'
