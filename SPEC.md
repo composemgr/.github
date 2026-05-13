@@ -9,7 +9,7 @@ This document defines the standards and conventions for all docker-compose.yaml 
 All services follow a standardized rootfs structure:
 
 ```
-./rootfs/
+./volumes/
 ├── config/          # Configuration files
 ├── data/            # Application data
 │   ├── log/         # Log files (centralized like /var/log)
@@ -26,14 +26,14 @@ Primary services use the **project name** for their directories:
 ```yaml
 # Project: gotify, Service: app (primary)
 volumes:
-  - './rootfs/data/gotify:/app/data'
-  - './rootfs/config/gotify:/config'
+  - './volumes/data/gotify:/app/data'
+  - './volumes/config/gotify:/config'
 
 # Project: authentik, Service: server (primary)
 volumes:
-  - './rootfs/data/authentik/media:/media'
-  - './rootfs/data/authentik/templates:/templates'
-  - './rootfs/config/authentik:/config'
+  - './volumes/data/authentik/media:/media'
+  - './volumes/data/authentik/templates:/templates'
+  - './volumes/config/authentik:/config'
 ```
 
 #### Sub-Services
@@ -42,30 +42,30 @@ Sub-services use their **actual service name** (with project prefix stripped):
 ```yaml
 # Project: authentik, Service: authentik-worker
 volumes:
-  - './rootfs/config/worker/certs:/certs'
-  - './rootfs/data/authentik/templates:/templates'
+  - './volumes/config/worker/certs:/certs'
+  - './volumes/data/authentik/templates:/templates'
 
 # Project: jitsi, Service: jitsi-prosody
 volumes:
-  - './rootfs/config/prosody:/config'
-  - './rootfs/data/prosody:/prosody-plugins-custom'
+  - './volumes/config/prosody:/config'
+  - './volumes/data/prosody:/prosody-plugins-custom'
 ```
 
 #### Database Services
-Databases always use the pattern: `./rootfs/db/{dbtype}/{projectname}`
+Databases always use the pattern: `./volumes/db/{dbtype}/{projectname}`
 
 ```yaml
 # Project: authentik, Service: authentik-redis
 volumes:
-  - './rootfs/db/redis/authentik:/data'
+  - './volumes/db/redis/authentik:/data'
 
 # Project: authentik, Service: authentik-db (postgres)
 volumes:
-  - './rootfs/db/postgres/authentik:/var/lib/postgresql/data'
+  - './volumes/db/postgres/authentik:/var/lib/postgresql/data'
 
 # Project: ampache, Service: ampache-db (mariadb)
 volumes:
-  - './rootfs/db/mariadb/ampache:/var/lib/mysql'
+  - './volumes/db/mariadb/ampache:/var/lib/mysql'
 ```
 
 #### Shared Directories
@@ -75,11 +75,11 @@ When services share data, both mount the same primary path:
 # Server and worker both need templates
 server:
   volumes:
-    - './rootfs/data/authentik/templates:/templates'
+    - './volumes/data/authentik/templates:/templates'
 
 worker:
   volumes:
-    - './rootfs/data/authentik/templates:/templates'
+    - './volumes/data/authentik/templates:/templates'
 ```
 
 #### Common Data Directories
@@ -88,18 +88,18 @@ For media, downloads, logs, or other shared content:
 ```yaml
 # Media files - use lowercase for everything
 volumes:
-  - './rootfs/data/media/movies:/movies'
-  - './rootfs/data/media/tv:/tv'
-  - './rootfs/data/media/music:/music'
+  - './volumes/data/media/movies:/movies'
+  - './volumes/data/media/tv:/tv'
+  - './volumes/data/media/music:/music'
   
 # Downloads
 volumes:
-  - './rootfs/data/downloads:/downloads'
+  - './volumes/data/downloads:/downloads'
   
 # Logs - centralized like /var/log
 volumes:
-  - './rootfs/data/log/servicename:/var/log/servicename'
-  - './rootfs/data/log/nginx:/var/log/nginx'
+  - './volumes/data/log/servicename:/var/log/servicename'
+  - './volumes/data/log/nginx:/var/log/nginx'
 ```
 
 ### Volume Mount Simplification
@@ -111,12 +111,12 @@ Do NOT simplify mounts when containers expect different internal paths:
 ```yaml
 # CORRECT - Keep separate when internal paths differ
 volumes:
-  - './rootfs/data/authentik/media:/media'
-  - './rootfs/data/authentik/templates:/templates'
+  - './volumes/data/authentik/media:/media'
+  - './volumes/data/authentik/templates:/templates'
 
 # WRONG - Don't combine if container needs specific paths
 volumes:
-  - './rootfs/data/authentik:/app'
+  - './volumes/data/authentik:/app'
 ```
 
 Simplify only when the container expects a single base path:
@@ -124,7 +124,7 @@ Simplify only when the container expects a single base path:
 ```yaml
 # CORRECT - Single mount when container uses one base
 volumes:
-  - './rootfs/data/gotify:/app/data'
+  - './volumes/data/gotify:/app/data'
 ```
 
 ## Container Naming
@@ -321,12 +321,12 @@ Use lowercase for all directory names and paths unless specifically required:
 
 ```yaml
 # CORRECT
-- './rootfs/data/media/movies:/movies'
-- './rootfs/config/nginx:/etc/nginx'
+- './volumes/data/media/movies:/movies'
+- './volumes/config/nginx:/etc/nginx'
 
 # WRONG
-- './rootfs/data/Media/Movies:/movies'
-- './rootfs/Data/NGINX:/etc/nginx'
+- './volumes/data/Media/Movies:/movies'
+- './volumes/Data/NGINX:/etc/nginx'
 ```
 
 ### Standard File Structure
@@ -352,7 +352,7 @@ x-logging: &default-logging
 services:
   app:
     image: gotify/server:latest
-    container_name: gotify-app
+    container_name: gotify-server
     # ... service configuration
 
 networks:
@@ -382,7 +382,7 @@ services:
     ports:
       - '172.17.0.1:port:containerport'
     volumes:
-      - './rootfs/data/projectname:/data'
+      - './volumes/data/projectname:/data'
     networks:
       - projectname
 ```
@@ -416,7 +416,7 @@ services:
     ports:
       - '172.17.0.1:62084:80'
     volumes:
-      - './rootfs/data/gotify:/app/data:z'
+      - './volumes/data/gotify:/app/data:z'
     networks:
       - gotify
 
@@ -447,8 +447,8 @@ services:
     pull_policy: always
     logging: *default-logging
     volumes:
-      - './rootfs/data/authentik/media:/media'
-      - './rootfs/data/authentik/templates:/templates'
+      - './volumes/data/authentik/media:/media'
+      - './volumes/data/authentik/templates:/templates'
     networks:
       - authentik
 
@@ -459,9 +459,9 @@ services:
     restart: always
     logging: *default-logging
     volumes:
-      - './rootfs/config/worker/certs:/certs'
-      - './rootfs/data/authentik/media:/media'
-      - './rootfs/data/authentik/templates:/templates'
+      - './volumes/config/worker/certs:/certs'
+      - './volumes/data/authentik/media:/media'
+      - './volumes/data/authentik/templates:/templates'
     networks:
       - authentik
 
@@ -472,18 +472,18 @@ services:
     restart: always
     logging: *default-logging
     volumes:
-      - './rootfs/db/redis/authentik:/data'
+      - './volumes/db/redis/authentik:/data'
     networks:
       - authentik
 
   db:
     image: postgres:16-alpine
-    container_name: authentik-db
+    container_name: authentik-postgres
     hostname: authentik-db
     restart: always
     logging: *default-logging
     volumes:
-      - './rootfs/db/postgres/authentik:/var/lib/postgresql/data'
+      - './volumes/db/postgres/authentik:/var/lib/postgresql/data'
     networks:
       - authentik
 
@@ -512,8 +512,8 @@ services:
     restart: always
     logging: *default-logging
     volumes:
-      - './rootfs/config/jitsi:/config:Z'
-      - './rootfs/data/jitsi/transcripts:/usr/share/jitsi-meet/transcripts:Z'
+      - './volumes/config/jitsi:/config:Z'
+      - './volumes/data/jitsi/transcripts:/usr/share/jitsi-meet/transcripts:Z'
     networks:
       - jitsi
 
@@ -523,8 +523,8 @@ services:
     restart: always
     logging: *default-logging
     volumes:
-      - './rootfs/config/prosody:/config:Z'
-      - './rootfs/data/prosody:/prosody-plugins-custom:Z'
+      - './volumes/config/prosody:/config:Z'
+      - './volumes/data/prosody:/prosody-plugins-custom:Z'
     networks:
       - jitsi
 
@@ -534,7 +534,7 @@ services:
     restart: always
     logging: *default-logging
     volumes:
-      - './rootfs/config/jicofo:/config:Z'
+      - './volumes/config/jicofo:/config:Z'
     networks:
       - jitsi
 
@@ -544,7 +544,7 @@ services:
     restart: always
     logging: *default-logging
     volumes:
-      - './rootfs/config/jvb:/config:Z'
+      - './volumes/config/jvb:/config:Z'
     networks:
       - jitsi
 
@@ -573,12 +573,12 @@ networks:
 ### Path Templates
 
 ```
-Primary:     ./rootfs/{type}/{projectname}
-Sub-Service: ./rootfs/{type}/{servicename}
-Database:    ./rootfs/db/{dbtype}/{projectname}
-Media:       ./rootfs/data/media/{mediatype}
-Downloads:   ./rootfs/data/downloads
-Logs:        ./rootfs/data/log/{servicename}
+Primary:     ./volumes/{type}/{projectname}
+Sub-Service: ./volumes/{type}/{servicename}
+Database:    ./volumes/db/{dbtype}/{projectname}
+Media:       ./volumes/data/media/{mediatype}
+Downloads:   ./volumes/data/downloads
+Logs:        ./volumes/data/log/{servicename}
 ```
 
 ### Container Name Template
