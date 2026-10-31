@@ -1,6 +1,169 @@
 # Docker Compose File Specification
 
-This document defines the standards and conventions for all docker-compose.yaml files in this repository.
+This document defines the standards and conventions for all Docker Compose repositories in the organization.
+
+## Source of truth
+
+This document is authoritative for every repository in the organization. Keep
+each repository's README, environment samples, compose files, and image
+references consistent with the actual upstream application. Reference stacks
+live in `.github/example/`.
+
+## Repository layout
+
+Compose files stay flat at the child repository root. Do not move them under a
+`docker/` directory. Runtime files and state are untracked:
+
+- `.env`
+- `app.env`
+- `default.env`
+- `volumes/`
+
+Each child repository has:
+
+- `docker-compose.yaml`
+- `docker-compose.traefik.yaml`
+- `docker-compose.tunnel.yaml`
+- `app.env.sample`
+- `default.env.sample`
+- `.gitignore`
+- `README.md`
+
+## Compose variants
+
+The three compose files are complete, standalone alternatives. They must not
+be combined with multiple `-f` arguments.
+
+- `docker-compose.yaml`: default host-published mode; first line is
+  `# nginx proxy address - http://172.17.0.1:{port}`; no proxy labels or
+  external proxy network.
+- `docker-compose.traefik.yaml`: no `ports:`; app joins the project network
+  and external `traefik` network; use Traefik labels.
+- `docker-compose.tunnel.yaml`: no `ports:`; app joins the project network
+  and external `cloudflare` network; use Cloudflare tunnel labels.
+
+Every file defines the project network with `external: false`. Database and
+cache services join only the project network in all variants. The app joins
+the project network and, in proxy variants, the matching external network.
+
+Use the shared `x-logging` JSON-file anchor, `pull_policy: always`, map-style
+environment variables, and a quoted published port. The container-side port is
+the app's own native port and varies per project; only the host-side port is
+normalized into the `64xxx` range. Confirm each native port against the
+upstream documentation rather than assuming.
+
+## Host gateway and port binding rules
+
+`172.17.0.1:` is the Docker host gateway bind address for production-shaped
+HTTP/HTTPS exposure. Use it only for the default host-published
+`docker-compose.yaml` variant, where nginx on the host proxies to the unique
+external port. The address must not appear in the Traefik or Cloudflare
+variants as a published port. It may still appear as a non-port default value,
+such as an SMTP relay address. It must also not be used for database, cache,
+debug, or internal-only service ports.
+
+The host-side port is always unique per project and falls in `64000`-`64999`.
+The container-side port is the app's native port and must be verified against
+upstream documentation. Do not publish internal service ports to the host.
+
+`docker-compose.traefik.yaml` and `docker-compose.tunnel.yaml` carry no
+`ports:` section at all — not even for an app with additional protocols such as
+SSH. Those ports are reachable only through the proxy variant's network.
+
+## Database and cache services
+
+For ordinary application stacks, database and cache services are internal-only.
+In every compose variant they must join only the project's internal network.
+They must never join `traefik` or `cloudflare`, must never have a `ports:`
+section, and must never use a `172.17.0.1:` bind. The app connects to them over
+Docker service names on the project network.
+
+A database, cache, or similar infrastructure project is the exception: its
+primary service is the product being deployed and may expose its native
+protocol port directly, using the image's standard internal and external port
+(for example `3306:3306` for MySQL/MariaDB or `5432:5432` for PostgreSQL).
+Do not use the `172.17.0.1:` HTTP bind for that native protocol port. If the
+same project includes a web management service such as phpMyAdmin, Adminer,
+or a database web console, that web service uses the normal unique
+`172.17.0.1:{port}:80` assignment and may use the proxy variants. Keep the
+database service itself on the project network only; expose only the documented
+native port and any separately assigned web-management port.
+
+Use the required persistent volume layout for database services:
+
+```yaml
+volumes:
+  - './volumes/db/{database-type}/{project_name}:/var/lib/{database-type}/data:z'
+```
+
+## Unique host ports
+
+Every child project must have a unique external host port in the `64000`-
+`64999` range. The port must be used only in that project's default compose
+file and README access URL. Never reuse a port already assigned to another
+project. Proxy variants do not publish ports.
+
+Current allocation is recorded in `PORTS.md`. `.github/example/` is `64000`;
+the repositories take `64100` onward in alphabetical order. Existing
+assignments must be preserved unless deliberately reallocated across the
+fleet.
+
+## Images
+
+Every image reference must be pullable from its stated registry and tag. An
+invalid image is a bug. Use the `:latest` tag whenever the upstream image
+provides it; users may pin an exact version in their local copy or environment
+where supported. Do not invent image names or tags. Verify new and changed
+references with `docker manifest inspect` before declaring work complete.
+
+Use a real, pullable image rather than a fictional placeholder.
+
+## Environment files
+
+`default.env.sample` mirrors the variables used by composemgr and uses an
+`export` prefix. `app.env.sample` is the app-specific override file and uses
+plain `KEY=VALUE` syntax without `export`.
+
+Document this raw Docker Compose workflow in every README:
+
+```bash
+cp default.env .env
+docker compose --env-file .env up -d
+```
+
+Compose stacks must boot using inline defaults without an env file. Composemgr
+handles `app.env` and `default.env` automatically; raw Docker Compose users
+must pass `--env-file .env`.
+
+Sample secrets and credentials must be obviously fake, such as
+`replace-with-a-random-password`; never use realistic tokens or credentials.
+
+## README requirements
+
+Each README documents the project description, services and actual image,
+installation options, environment files, the assigned `172.17.0.1:{port}` URL,
+volumes, security guidance where relevant, logging, management commands,
+requirements, and author information. Raw Docker Compose commands include
+`--env-file .env` whenever they rely on `.env`.
+
+## Verification
+
+Before completing changes:
+
+1. Parse every changed compose file with `docker compose config -q`.
+2. Verify env-file resolution with `docker compose --env-file .env config` or
+   an equivalent sample env file.
+3. Verify every changed image reference with `docker manifest inspect`, and
+   confirm the native port with `docker image inspect --format
+   '{{json .Config.ExposedPorts}}'`.
+4. Confirm the project's external port is unique across all child compose
+   files and is in the `64000`-`64999` range.
+5. Confirm no real secrets or runtime files are tracked.
+6. Confirm the proxy variants contain no `ports:` section.
+
+`docker compose config -q` only proves the file parses. It does not prove the
+stack boots, so report per repository what was verified and what was not.
+
 
 ## Directory Structure
 
@@ -161,41 +324,66 @@ services:
 ## Network Configuration
 
 ### Network Structure
-Each project defines only its own internal network as `external: false`.
 
-**Remove all external proxy and cloudflare network declarations.**
+Every project ships **three standalone compose files**, never one file with conditional network membership:
+
+| File | Purpose | Networks |
+|------|---------|----------|
+| `docker-compose.yaml` | Default, direct `172.17.0.1:{port}` publish | project only |
+| `docker-compose.traefik.yaml` | Traefik reverse proxy | project + external `traefik` |
+| `docker-compose.tunnel.yaml` | Cloudflare tunnel | project + external `cloudflare` |
+
+Each project defines its own internal network as `external: false` in **all three** files.
 
 ```yaml
-# CORRECT
+# CORRECT - docker-compose.yaml
 networks:
   gotify:
     name: gotify
     external: false
 
-# WRONG - Do not include external networks
+# CORRECT - docker-compose.traefik.yaml
 networks:
   gotify:
     name: gotify
     external: false
-  proxy:
+  traefik:
+    external: true
+
+# WRONG - never mix the proxy and tunnel networks into one file
+networks:
+  gotify:
+    name: gotify
+    external: false
+  traefik:
     external: true
   cloudflare:
     external: true
 ```
 
 ### Service Network Membership
-Services should only be members of their project network:
+
+The **app** service joins the project network plus the external network matching the file it is in. **Database and cache services join only the project network in all three files** — they are never published through a proxy.
 
 ```yaml
+# docker-compose.yaml
 services:
   app:
     networks:
       - gotify
+  db:
+    networks:
+      - gotify
 
-networks:
-  gotify:
-    name: gotify
-    external: false
+# docker-compose.traefik.yaml
+services:
+  app:
+    networks:
+      - gotify
+      - traefik
+  db:
+    networks:
+      - gotify
 ```
 
 ## Environment Variables
@@ -204,9 +392,9 @@ All environment variables must have **sane defaults** to work without .env files
 
 ```yaml
 environment:
-  - TZ=${TZ:-America/New_York}
-  - HOSTNAME=${BASE_HOST_NAME:-$HOSTNAME}
-  - DB_PASSWORD=${DB_ADMIN_PASS:-changeme123}
+  TZ: ${TZ:-America/New_York}
+  HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
+  DB_PASSWORD: ${DB_ADMIN_PASS:-changeme123}
 ```
 
 ### Common Variables
@@ -253,13 +441,13 @@ environment:
 ```yaml
 environment:
   # Email settings
-  - EMAIL_HOST=${EMAIL_SERVER_HOST:-172.17.0.1}
-  - EMAIL_PORT=${EMAIL_SERVER_PORT:-587}
-  - EMAIL_FROM_NAME=${EMAIL_SERVER_FROM_ORG:-Authentik}
-  - EMAIL_FROM=${EMAIL_SERVER_MAIL_FROM:-no-reply@${BASE_DOMAIN_NAME:-${BASE_HOST_NAME}}}
-  - EMAIL_USER=${EMAIL_SERVER_LOGIN_NAME:-}
-  - EMAIL_PASS=${EMAIL_SERVER_LOGIN_PASS:-}
-  - EMAIL_TIMEOUT=${EMAIL_SERVER_TIMEOUT:-10}
+  EMAIL_HOST: ${EMAIL_SERVER_HOST:-172.17.0.1}
+  EMAIL_PORT: ${EMAIL_SERVER_PORT:-587}
+  EMAIL_FROM_NAME: ${EMAIL_SERVER_FROM_ORG:-Authentik}
+  EMAIL_FROM: ${EMAIL_SERVER_MAIL_FROM:-no-reply@${BASE_DOMAIN_NAME:-${BASE_HOST_NAME}}}
+  EMAIL_USER: ${EMAIL_SERVER_LOGIN_NAME:-}
+  EMAIL_PASS: ${EMAIL_SERVER_LOGIN_PASS:-}
+  EMAIL_TIMEOUT: ${EMAIL_SERVER_TIMEOUT:-10}
 ```
 
 #### Organization
@@ -293,9 +481,9 @@ head -n128 /dev/urandom|tr -dc 'A-Za-z0-9' | head -c 32|openssl passwd -1 -salt 
 
 ```yaml
 environment:
-  - DB_ADMIN_PASS=${DB_ADMIN_PASS:-changeme_db_admin_password}
-  - APP_SECRET_KEY=${APP_SECRET_KEY:-changeme_secret_key_min_32_chars}
-  - APP_API_TOKEN=${APP_API_TOKEN:-changeme_api_token}
+  DB_ADMIN_PASS: ${DB_ADMIN_PASS:-changeme_db_admin_password}
+  APP_SECRET_KEY: ${APP_SECRET_KEY:-changeme_secret_key_min_32_chars}
+  APP_API_TOKEN: ${APP_API_TOKEN:-changeme_api_token}
 ```
 
 ## Code Style
@@ -340,7 +528,7 @@ All compose files should follow this order:
 6. `networks:` section
 
 ```yaml
-# nginx proxy address - http://172.17.0.1:62084
+# nginx proxy address - http://172.17.0.1:64189
 
 name: gotify
 x-logging: &default-logging
@@ -376,9 +564,9 @@ services:
     pull_policy: always
     logging: *default-logging
     environment:
-      - TZ=${TZ:-America/New_York}
-      - CONTAINER_NAME: projectname-app
-      - HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
+      TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: projectname-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
     ports:
       - '172.17.0.1:port:containerport'
     volumes:
@@ -392,7 +580,7 @@ services:
 ### Simple Single Service (gotify)
 
 ```yaml
-# nginx proxy address - http://172.17.0.1:62084
+# nginx proxy address - http://172.17.0.1:64189
 
 name: gotify
 x-logging: &default-logging
@@ -414,7 +602,7 @@ services:
       CONTAINER_NAME: gotify-app
       HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
     ports:
-      - '172.17.0.1:62084:80'
+      - '172.17.0.1:64189:80'
     volumes:
       - './volumes/data/gotify:/app/data:z'
     networks:
@@ -429,7 +617,7 @@ networks:
 ### Complex Multi-Service (authentik)
 
 ```yaml
-# nginx proxy address - http://172.17.0.1:62000
+# nginx proxy address - http://172.17.0.1:64115
 
 name: authentik
 x-logging: &default-logging
@@ -496,7 +684,7 @@ networks:
 ### Multi-Component Service (jitsi)
 
 ```yaml
-# nginx proxy address - http://172.17.0.1:60236
+# nginx proxy address - http://172.17.0.1:64217
 
 name: jitsi
 x-logging: &default-logging

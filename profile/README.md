@@ -18,7 +18,7 @@ curl -q -LSsf "https://raw.githubusercontent.com/composemgr/postgres/main/docker
 ## Documentation
 
 - **[Main README](../../README.md)** - Complete guide with all environment variables
-- **[Technical Specification](../SPEC.md)** - Detailed technical specification
+- **[Technical Specification](../AI.md)** - Detailed technical specification
 
 ## Categories (135 Projects)
 

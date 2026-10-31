@@ -1,0 +1,37 @@
+name: example
+x-logging: &default-logging
+  options:
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
+
+services:
+  app:
+    image: nginx:latest
+    container_name: example-app
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: example-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-changeme_secret_key_min_32_chars}
+    volumes:
+      - './volumes/data/example:/data:z'
+      - './volumes/config/example:/config:z'
+    labels:
+      - 'cloudflare.enable=true'
+      - 'cloudflare.service=http://example-app:80'
+      - 'cloudflare.hostname=${BASE_HOST_NAME:-$HOSTNAME}'
+    networks:
+      - example
+      - cloudflare
+
+networks:
+  example:
+    name: example
+    external: false
+  cloudflare:
+    external: true

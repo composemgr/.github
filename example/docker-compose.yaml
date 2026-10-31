@@ -1,6 +1,6 @@
-# nginx proxy address - http://172.17.0.1:62000
+# nginx proxy address - http://172.17.0.1:64000
 
-name: test
+name: example
 x-logging: &default-logging
   options:
     max-size: '5m'
@@ -9,48 +9,26 @@ x-logging: &default-logging
 
 services:
   app:
-    image: test:latest
-    container_name: test-app
+    image: nginx:latest
+    container_name: example-app
     hostname: ${BASE_HOST_NAME:-$HOSTNAME}
     restart: always
     pull_policy: always
     logging: *default-logging
     environment:
       TZ: ${TZ:-America/New_York}
-      CONTAINER_NAME: test-app
+      CONTAINER_NAME: example-app
       HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-changeme_secret_key_min_32_chars}
     ports:
-      - '172.17.0.1:62000:3000'
+      - '172.17.0.1:64000:80'
     volumes:
-      - './volumes/data:/data:z'
-      - './volumes/config:/config:z'
-    labels:
-      - 'traefik.enable=true'
-      - 'cloudflare.enable=true'
-      - 'traefik.docker.network=proxy'
-      - 'cloudflare.service=http://test-app:3000'
-      - 'cloudflare.hostname=test.${CLOUDFLARE_ZONE_NAME:-}'
-      - 'traefik.http.routers.test-app.entrypoints=http'
-      - 'traefik.http.routers.test-app-secure.tls=true'
-      - 'traefik.http.routers.test-app.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
-      - 'traefik.http.middlewares.test-app-https-redirect.redirectscheme.scheme=https'
-      - 'traefik.http.routers.test-app.middlewares=test-app-https-redirect'
-      - 'traefik.http.routers.test-app-secure.entrypoints=https'
-      - 'traefik.http.routers.test-app-secure.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
-      - 'traefik.http.routers.test-app-secure.tls.certresolver=cloudflare'
-      - 'traefik.http.routers.test-app-secure.service=test-app'
-      - 'traefik.http.services.test-app.loadbalancer.server.port=3000'
+      - './volumes/data/example:/data:z'
+      - './volumes/config/example:/config:z'
     networks:
-      - test
-      - proxy
-      - cloudflare
+      - example
 
 networks:
-  test:
-    name: test
+  example:
+    name: example
     external: false
-  proxy:
-    external: true
-  cloudflare:
-    external: true
-
