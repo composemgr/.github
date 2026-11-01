@@ -37,6 +37,8 @@ be combined with multiple `-f` arguments.
 - `docker-compose.yaml`: default host-published mode; first line is
   `# nginx proxy address - http://172.17.0.1:{port}`; no proxy labels or
   external proxy network.
+  A project with no HTTP interface (database, broker, CLI tool) replaces that
+  first line with a comment saying so and publishes only its native port.
 - `docker-compose.traefik.yaml`: no `ports:`; app joins the project network
   and external `traefik` network; use Traefik labels.
 - `docker-compose.tunnel.yaml`: no `ports:`; app joins the project network
@@ -69,6 +71,12 @@ upstream documentation. Do not publish internal service ports to the host.
 `docker-compose.traefik.yaml` and `docker-compose.tunnel.yaml` carry no
 `ports:` section at all — not even for an app with additional protocols such as
 SSH. Those ports are reachable only through the proxy variant's network.
+
+Exception: an infrastructure project whose primary service is the product
+being deployed (for example a DNS server such as pihole or technitium, or a
+Tor relay) keeps its native protocol ports in every variant, because those
+protocols cannot be proxied over HTTP. Its web UI still follows the normal
+proxy rules, and the `172.17.0.1:` HTTP bind is never used for protocol ports.
 
 ## Database and cache services
 
