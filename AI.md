@@ -39,9 +39,9 @@ be combined with multiple `-f` arguments.
   external proxy network.
   A project with no HTTP interface (database, broker, CLI tool) replaces that
   first line with a comment saying so and publishes only its native port.
-- `docker-compose.traefik.yaml`: no `ports:`; app joins the project network
+- `docker-compose.traefik.yaml`: no HTTP `ports:`; app joins the project network
   and external `traefik` network; use Traefik labels.
-- `docker-compose.tunnel.yaml`: no `ports:`; app joins the project network
+- `docker-compose.tunnel.yaml`: no HTTP `ports:`; app joins the project network
   and external `cloudflare` network; use Cloudflare tunnel labels.
 
 Every file defines the project network with `external: false`. Database and
@@ -68,15 +68,16 @@ The host-side port is always unique per project and falls in `64000`-`64999`.
 The container-side port is the app's native port and must be verified against
 upstream documentation. Do not publish internal service ports to the host.
 
-`docker-compose.traefik.yaml` and `docker-compose.tunnel.yaml` carry no
-`ports:` section at all — not even for an app with additional protocols such as
-SSH. Those ports are reachable only through the proxy variant's network.
-
-Exception: an infrastructure project whose primary service is the product
-being deployed (for example a DNS server such as pihole or technitium, or a
-Tor relay) keeps its native protocol ports in every variant, because those
-protocols cannot be proxied over HTTP. Its web UI still follows the normal
-proxy rules, and the `172.17.0.1:` HTTP bind is never used for protocol ports.
+`docker-compose.traefik.yaml` and `docker-compose.tunnel.yaml` publish no HTTP
+or HTTPS ports and never use a `172.17.0.1:` bind. Non-HTTP protocol ports the
+image declares and the product needs (for example XMPP, Git SSH, DNS, Tor,
+Minecraft, BitTorrent, SMTP/IMAP) cannot be proxied over HTTP, so they are
+published identically in all three variants as plain `host:container` ports
+(add `/udp` where needed). A port range may use `a-b:a-b`. Git SSH on `22` is
+mapped to a unique non-privileged host port (`2222`, `2223`, ...) to avoid the
+host's own sshd. Admin, API and cluster-internal ports (for example Caddy's
+`2019`) are not published. Confirm the needed ports against the image's
+`ExposedPorts` and upstream documentation.
 
 ## Database and cache services
 
@@ -167,7 +168,7 @@ Before completing changes:
 4. Confirm the project's external port is unique across all child compose
    files and is in the `64000`-`64999` range.
 5. Confirm no real secrets or runtime files are tracked.
-6. Confirm the proxy variants contain no `ports:` section.
+6. Confirm the proxy variants publish no HTTP/HTTPS ports and no `172.17.0.1:` bind, and that every needed non-HTTP protocol port is published in all three variants.
 
 `docker compose config -q` only proves the file parses. It does not prove the
 stack boots, so report per repository what was verified and what was not.
