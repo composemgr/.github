@@ -127,6 +127,24 @@ references with `docker manifest inspect` before declaring work complete.
 
 Use a real, pullable image rather than a fictional placeholder.
 
+## Healthchecks
+
+Every service defines an explicit `healthcheck:` in all three compose variants,
+using the same test in each. Use a tool the image actually contains and test
+against the container's own native port on `127.0.0.1`:
+
+- HTTP apps: `curl` or `wget` against `/`; any HTTP response, including a
+  redirect or `401`, counts as healthy.
+- Databases and caches: the native client (`pg_isready`, `mysqladmin ping`,
+  `redis-cli ping`, `mongosh`).
+- Other TCP services: `nc -z`, or `bash` with `/dev/tcp` when `nc` is absent.
+- Images with a shell-less or tool-less filesystem and no usable client get no
+  healthcheck, and the README says why.
+
+Default timings are `interval: 30s`, `timeout: 10s`, `retries: 5` and
+`start_period: 30s`; raise `start_period` for slow-starting applications.
+Dependent services may use `depends_on` with `condition: service_healthy`.
+
 ## Environment files
 
 `default.env.sample` mirrors the variables used by composemgr and uses an
