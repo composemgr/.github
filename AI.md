@@ -127,6 +127,14 @@ references with `docker manifest inspect` before declaring work complete.
 
 Use a real, pullable image rather than a fictional placeholder.
 
+Prefer the image the upstream project publishes and maintains. Bitnami
+(`bitnami/*`) images are not maintained and must not be used; switch to the
+official upstream image and map its documented environment variables. When an
+image publishes no `latest` tag (or `latest` tracks an unreleased branch), pin
+the newest stable release tag or major series and note it in the README.
+Mirrors that no longer resolve (for example `*.docker.scarf.sh`) must be
+replaced with the registry that actually hosts the image.
+
 ## Healthchecks
 
 Every service defines an explicit `healthcheck:` in all three compose variants,
